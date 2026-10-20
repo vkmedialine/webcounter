@@ -1,19 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, History as HistoryIcon, Plus, Save, Activity, Sun, Moon, LogOut, Award } from 'lucide-react';
+import { 
+  Target, 
+  TrendingUp, 
+  History as HistoryIcon, 
+  Plus, 
+  Activity, 
+  LogOut, 
+  Award, 
+  Settings as SettingsIcon 
+} from 'lucide-react';
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, orderBy, limit, getDocs, increment } from 'firebase/firestore';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  getDocs, 
+  increment 
+} from 'firebase/firestore';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import Auth from './Auth';
+import Settings from './Settings';
+import { soundFX, triggerHaptic } from './utils/audio';
+import { applyThemeAndAccent } from './utils/theme';
 
-function CounterApp({ type, title, userId }) {
+function CounterApp({ type, title, userId, settings }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [counter, setCounter] = useState(null);
   const [history, setHistory] = useState([]);
-  const [editTarget, setEditTarget] = useState('');
-  const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [activeTab, setActiveTab] = useState('counter');
+
+  const defaultGoal = type === 'janmangal' 
+    ? (settings?.targetJanmangal || 10) 
+    : (settings?.targetMalajaap || 11);
 
   const fetchTotal = async () => {
     try {
@@ -41,13 +67,16 @@ function CounterApp({ type, title, userId }) {
         const q = query(daysRef, where("date", "<", todayStr), orderBy("date", "desc"), limit(1));
         const pastSnap = await getDocs(q);
 
-        let target = 10;
+        let target = defaultGoal;
         let carriedOver = 0;
 
         if (!pastSnap.empty) {
           const last = pastSnap.docs[0].data();
-          target = last.target;
-          carriedOver = Math.max(0, (last.target + (last.carriedOver || 0)) - last.count);
+          target = last.target || defaultGoal;
+          
+          if (settings?.carryOverIncomplete !== false) {
+            carriedOver = Math.max(0, (last.target + (last.carriedOver || 0)) - last.count);
+          }
         }
 
         currentCounter = { date: todayStr, target, count: 0, carriedOver };
@@ -55,9 +84,6 @@ function CounterApp({ type, title, userId }) {
       }
 
       setCounter(currentCounter);
-      if (currentCounter.target !== undefined) {
-        setEditTarget(currentCounter.target.toString());
-      }
       setError(null);
     } catch (err) {
       console.error('Error fetching today counter:', err);
@@ -81,7 +107,7 @@ function CounterApp({ type, title, userId }) {
   useEffect(() => {
     fetchToday();
     fetchTotal();
-  }, []);
+  }, [type, userId]);
 
   useEffect(() => {
     if (counter) {
@@ -91,6 +117,24 @@ function CounterApp({ type, title, userId }) {
 
   const handleIncrement = async () => {
     try {
+      // Audio feedback
+      if (settings?.soundEnabled !== false) {
+        soundFX.playByType(settings?.soundType || 'bead');
+      }
+
+      // Haptic feedback
+      if (settings?.hapticEnabled !== false) {
+        triggerHaptic(25);
+      }
+
+      const totalTarget = counter.target + (counter.carriedOver || 0);
+      const newCount = counter.count + 1;
+
+      // Target achievement celebration
+      if (newCount === totalTarget && settings?.celebrationSound !== false) {
+        soundFX.playTargetComplete();
+      }
+
       const todayStr = new Date().toISOString().split('T')[0];
       const docRef = doc(db, 'users', userId, 'counters', type, 'days', todayStr);
       await updateDoc(docRef, { count: increment(1) });
@@ -99,22 +143,6 @@ function CounterApp({ type, title, userId }) {
       fetchHistory();
     } catch (err) {
       console.error('Error incrementing:', err);
-    }
-  };
-
-  const handleSaveTarget = async () => {
-    try {
-      const targetVal = parseInt(editTarget, 10);
-      if (isNaN(targetVal)) return;
-
-      const todayStr = new Date().toISOString().split('T')[0];
-      const docRef = doc(db, 'users', userId, 'counters', type, 'days', todayStr);
-      await updateDoc(docRef, { target: targetVal });
-      
-      setCounter(prev => ({ ...prev, target: targetVal }));
-      setIsEditingTarget(false);
-    } catch (err) {
-      console.error('Error updating target:', err);
     }
   };
 
@@ -137,7 +165,7 @@ function CounterApp({ type, title, userId }) {
   }
 
   // Calculate total target and remaining
-  const totalTarget = counter.target + counter.carriedOver;
+  const totalTarget = counter.target + (counter.carriedOver || 0);
   const remaining = Math.max(0, totalTarget - counter.count);
 
   return (
@@ -149,12 +177,14 @@ function CounterApp({ type, title, userId }) {
 
       <div className="tabs">
         <button
+          id="counter-tab-btn"
           className={`tab ${activeTab === 'counter' ? 'active' : ''}`}
           onClick={() => setActiveTab('counter')}
         >
           Counter
         </button>
         <button
+          id="history-tab-btn"
           className={`tab ${activeTab === 'history' ? 'active' : ''}`}
           onClick={() => setActiveTab('history')}
         >
@@ -208,35 +238,10 @@ function CounterApp({ type, title, userId }) {
           </div>
 
           <div className="controls">
-            <button className="btn-main" onClick={handleIncrement}>
+            <button id="main-count-btn" className="btn-main" onClick={handleIncrement}>
               <Plus size={36} />
               <span>Count</span>
             </button>
-
-            <div className="target-setter">
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Daily Target:</span>
-              {isEditingTarget ? (
-                <>
-                  <input
-                    type="number"
-                    value={editTarget}
-                    onChange={e => setEditTarget(e.target.value)}
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && handleSaveTarget()}
-                  />
-                  <button className="btn-small" onClick={handleSaveTarget}>
-                    <Save size={16} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span style={{ fontSize: '1.2rem', fontWeight: 600 }}>{counter.target}</span>
-                  <button className="btn-small" onClick={() => setIsEditingTarget(true)}>
-                    Edit
-                  </button>
-                </>
-              )}
-            </div>
           </div>
         </>
       )}
@@ -248,7 +253,7 @@ function CounterApp({ type, title, userId }) {
           </div>
           <div className="history-list">
             {history.map(item => {
-              const itemTotalTarget = item.target + item.carriedOver;
+              const itemTotalTarget = item.target + (item.carriedOver || 0);
               const itemRemaining = Math.max(0, itemTotalTarget - item.count);
               return (
                 <div className="history-item" key={item.date}>
@@ -280,27 +285,63 @@ function CounterApp({ type, title, userId }) {
   );
 }
 
+const DEFAULT_SETTINGS = {
+  theme: localStorage.getItem('webcounter_theme') || 'dark',
+  accent: localStorage.getItem('webcounter_accent') || 'blue',
+  targetJanmangal: 10,
+  targetMalajaap: 11,
+  soundEnabled: true,
+  soundType: 'bead',
+  hapticEnabled: true,
+  celebrationSound: true,
+  carryOverIncomplete: true,
+};
+
 function App() {
-  const [activeCounter, setActiveCounter] = useState('janmangal');
-  const [theme, setTheme] = useState('dark');
+  const [activeCounter, setActiveCounter] = useState('janmangal'); // 'janmangal' | 'malajaap' | 'settings'
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [settings, setSettings] = useState(() => {
+    try {
+      const cached = localStorage.getItem('webcounter_settings');
+      return cached ? { ...DEFAULT_SETTINGS, ...JSON.parse(cached) } : DEFAULT_SETTINGS;
+    } catch (e) {
+      return DEFAULT_SETTINGS;
+    }
+  });
 
+  // Apply theme & accent variables dynamically
   useEffect(() => {
-    document.body.className = theme === 'light' ? 'light-mode' : '';
-  }, [theme]);
+    applyThemeAndAccent(settings.theme, settings.accent);
+    localStorage.setItem('webcounter_theme', settings.theme);
+    localStorage.setItem('webcounter_accent', settings.accent);
+    localStorage.setItem('webcounter_settings', JSON.stringify(settings));
+  }, [settings.theme, settings.accent]);
 
+  // Auth observer and settings fetcher
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setAuthLoading(false);
+
+      if (currentUser) {
+        try {
+          const settingsRef = doc(db, 'users', currentUser.uid, 'settings', 'preferences');
+          const snap = await getDoc(settingsRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            setSettings(prev => ({ ...prev, ...data }));
+            if (data.theme || data.accent) {
+              applyThemeAndAccent(data.theme || settings.theme, data.accent || settings.accent);
+            }
+          }
+        } catch (err) {
+          console.warn('Could not load remote user preferences:', err);
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
 
   const handleLogout = async () => {
     try {
@@ -323,37 +364,68 @@ function App() {
       <div className="top-nav">
         <div className="nav-buttons">
           <button 
+            id="nav-janmangal-btn"
             className={`nav-btn ${activeCounter === 'janmangal' ? 'active' : ''}`}
             onClick={() => setActiveCounter('janmangal')}
           >
             Janmangal
           </button>
           <button 
+            id="nav-malajaap-btn"
             className={`nav-btn ${activeCounter === 'malajaap' ? 'active' : ''}`}
             onClick={() => setActiveCounter('malajaap')}
           >
             Malajaap
           </button>
+          <button 
+            id="nav-settings-btn"
+            className={`nav-btn ${activeCounter === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveCounter('settings')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <SettingsIcon size={16} />
+            <span>Settings</span>
+          </button>
         </div>
+
         <div className="nav-actions">
-          <span className="user-email" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem', fontSize: '1rem', fontWeight: '500', color: 'var(--text-primary)' }}>
+          {/* User Profile Chip - Clicking directly opens Settings */}
+          <div 
+            id="nav-user-profile-chip"
+            className="user-profile-chip" 
+            onClick={() => setActiveCounter('settings')}
+            title="User Settings & Profile"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.25rem', fontSize: '0.95rem', fontWeight: '500', color: 'var(--text-primary)' }}
+          >
             {user.photoURL ? (
-              <img src={user.photoURL} alt="Profile" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 10px var(--accent-glow)' }} />
+              <img 
+                src={user.photoURL} 
+                alt="Profile" 
+                style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 10px var(--accent-glow)' }} 
+              />
             ) : (
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 'bold', fontSize: '0.9rem', boxShadow: '0 4px 10px var(--accent-glow)' }}>
                 {(user.displayName || (user.email ? user.email : 'U')).charAt(0).toUpperCase()}
               </div>
             )}
-            {user.displayName || (user.email ? user.email.split('@')[0] : 'User')}
-          </span>
-          <button 
-            className="action-btn" 
-            onClick={toggleTheme}
-            title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+            <span style={{ maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user.displayName || (user.email ? user.email.split('@')[0] : 'User')}
+            </span>
+          </div>
+
+          {/* Direct Settings Icon */}
+          <button
+            id="nav-settings-icon-btn"
+            className={`action-btn ${activeCounter === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveCounter('settings')}
+            title="User Settings"
           >
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+            <SettingsIcon size={20} />
           </button>
+
+          {/* Logout Button */}
           <button 
+            id="nav-logout-btn"
             className="action-btn logout-btn" 
             onClick={handleLogout}
             title="Logout"
@@ -363,8 +435,36 @@ function App() {
         </div>
       </div>
 
-      {activeCounter === 'janmangal' && <CounterApp key={`janmangal-${user.uid}`} type="janmangal" title="Janmangal Counter" userId={user.uid} />}
-      {activeCounter === 'malajaap' && <CounterApp key={`malajaap-${user.uid}`} type="malajaap" title="Malajaap Counter" userId={user.uid} />}
+      {/* Main Views */}
+      {activeCounter === 'settings' && (
+        <Settings 
+          user={user} 
+          onBack={() => setActiveCounter('janmangal')}
+          onUserUpdate={(updatedUser) => setUser(updatedUser)}
+          currentSettings={settings}
+          onSettingsSave={(newSettings) => setSettings(newSettings)}
+        />
+      )}
+
+      {activeCounter === 'janmangal' && (
+        <CounterApp 
+          key={`janmangal-${user.uid}`} 
+          type="janmangal" 
+          title="Janmangal Counter" 
+          userId={user.uid} 
+          settings={settings}
+        />
+      )}
+
+      {activeCounter === 'malajaap' && (
+        <CounterApp 
+          key={`malajaap-${user.uid}`} 
+          type="malajaap" 
+          title="Malajaap Counter" 
+          userId={user.uid} 
+          settings={settings}
+        />
+      )}
     </div>
   );
 }
