@@ -828,7 +828,7 @@ export default function Settings({ user, onBack, onUserUpdate, currentSettings, 
                 <h4>Goal Celebration Chime</h4>
                 <p>Play a joyful harmonic arpeggio when you successfully reach your daily target.</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div className="toggle-actions">
                 <button
                   type="button"
                   className="btn-small"
@@ -856,7 +856,7 @@ export default function Settings({ user, onBack, onUserUpdate, currentSettings, 
                 <h4>Vibration / Haptic Feedback</h4>
                 <p>Subtle physical vibration on tap for supported mobile and touch devices.</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div className="toggle-actions">
                 <button
                   type="button"
                   className="btn-small"
