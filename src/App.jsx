@@ -117,14 +117,14 @@ function CounterApp({ type, title, userId, settings }) {
 
   const handleIncrement = async () => {
     try {
+      // Haptic feedback FIRST (55ms overcomes motor inertia)
+      if (settings?.hapticEnabled !== false) {
+        triggerHaptic(55);
+      }
+
       // Audio feedback
       if (settings?.soundEnabled !== false) {
         soundFX.playByType(settings?.soundType || 'bead');
-      }
-
-      // Haptic feedback
-      if (settings?.hapticEnabled !== false) {
-        triggerHaptic(25);
       }
 
       const totalTarget = counter.target + (counter.carriedOver || 0);
@@ -238,7 +238,16 @@ function CounterApp({ type, title, userId, settings }) {
           </div>
 
           <div className="controls">
-            <button id="main-count-btn" className="btn-main" onClick={handleIncrement}>
+            <button 
+              id="main-count-btn" 
+              className="btn-main" 
+              onClick={handleIncrement}
+              onTouchStart={() => {
+                if (settings?.hapticEnabled !== false) {
+                  triggerHaptic(55);
+                }
+              }}
+            >
               <Plus size={36} />
               <span>Count</span>
             </button>
