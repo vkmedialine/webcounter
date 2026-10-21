@@ -26,13 +26,16 @@ import { auth, db } from './firebase';
 import { soundFX, triggerHaptic } from './utils/audio';
 import { ACCENT_PALETTES, applyThemeAndAccent } from './utils/theme';
 
-// Curated avatar presets with spiritual and serene designs
+// Curated vibrant cartoon avatar presets
 const AVATAR_PRESETS = [
-  { id: 'preset-1', name: 'Saffron Aura', url: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=150&q=80' },
-  { id: 'preset-2', name: 'Lotus Peace', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=150&q=80' },
-  { id: 'preset-3', name: 'Meditation Dawn', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=150&q=80' },
-  { id: 'preset-4', name: 'Sacred Flame', url: 'https://images.unsplash.com/photo-1608848461950-0fe51dfc41cb?auto=format&fit=crop&w=150&q=80' },
-  { id: 'preset-5', name: 'Temple Bells', url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=150&q=80' },
+  { id: 'preset-1', name: 'Leo (Cartoon)', url: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Leo&backgroundColor=b6e3f4' },
+  { id: 'preset-2', name: 'Mia (Cartoon)', url: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Mia&backgroundColor=ffd5dc' },
+  { id: 'preset-3', name: 'Aria (Adventurer)', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Aria&backgroundColor=c0aede' },
+  { id: 'preset-4', name: 'Felix (Smart)', url: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Felix&backgroundColor=d1d4f9' },
+  { id: 'preset-5', name: 'Zoe (Explorer)', url: 'https://api.dicebear.com/9.x/adventurer/svg?seed=Zoe&backgroundColor=ffdfbf' },
+  { id: 'preset-6', name: 'Milo (Joyful)', url: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Milo&backgroundColor=c1f0c1' },
+  { id: 'preset-7', name: 'Sparky (Bot)', url: 'https://api.dicebear.com/9.x/bottts/svg?seed=Sparky&backgroundColor=b6e3f4' },
+  { id: 'preset-8', name: 'Luna (Dreamer)', url: 'https://api.dicebear.com/9.x/avataaars/svg?seed=Luna&backgroundColor=ffd5dc' },
 ];
 
 const ACCENT_OPTIONS = Object.values(ACCENT_PALETTES);

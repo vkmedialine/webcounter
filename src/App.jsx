@@ -422,16 +422,6 @@ function App() {
             </span>
           </div>
 
-          {/* Direct Settings Icon */}
-          <button
-            id="nav-settings-icon-btn"
-            className={`action-btn ${activeCounter === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveCounter('settings')}
-            title="User Settings"
-          >
-            <SettingsIcon size={20} />
-          </button>
-
           {/* Logout Button */}
           <button 
             id="nav-logout-btn"
